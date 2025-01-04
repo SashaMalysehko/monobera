@@ -1,5 +1,6 @@
 "use client";
 
+import type { FC } from "react";
 import { useMemo, useState } from "react";
 import { useQuery } from "@apollo/client";
 import {
@@ -25,7 +26,67 @@ import { getTime } from "~/utils/getTime";
 import { fillSupplyDataByDay, fillVolumeDataByDay } from "~/utils/graph-utils";
 import { HoneyTimeFrame, barColors, type HoneyEntry } from "~/app/type";
 
-const Options = {
+interface HoneyChartProps {
+  arcade?: boolean;
+}
+
+interface ChartOptions {
+  responsive: boolean;
+  maintainAspectRatio: boolean;
+  scales: {
+    x: {
+      display: boolean;
+      border: { display: boolean };
+      grid: { display: boolean };
+    };
+    y: {
+      border: { display: boolean };
+      grid: { display: boolean };
+    };
+  };
+  elements: {
+    point: { radius: number };
+    line: { tension: number };
+  };
+  plugins: {
+    legend: { display: boolean };
+    title: { display: boolean; text: string };
+    tooltip: {
+      displayColors: boolean;
+      position: string;
+      borderRadius: number;
+      caretSize: number;
+      interaction: { intersect: boolean };
+      callbacks: {
+        label: (context: {
+          dataset: { label: string };
+          parsed: { y: number | bigint | null };
+        }) => string;
+      };
+    };
+  };
+}
+
+interface ChartDataset {
+  data: number[];
+  labelColor: boolean;
+  backgroundColor: string;
+  borderColor: string;
+  hoverBackgroundColor: string;
+  hoverBorderColor: string;
+  tension: number;
+  borderRadius: number;
+  borderSkipped: boolean;
+  maxBarThickness: number;
+  minBarLength: number;
+}
+
+interface ChartData {
+  labels: string[][];
+  datasets: ChartDataset[];
+}
+
+const Options: ChartOptions = {
   responsive: true,
   maintainAspectRatio: false,
   scales: {
@@ -101,7 +162,7 @@ enum Chart {
   FEES = "supply",
 }
 
-const getData = (data: HoneyEntry[], arcade: boolean) => {
+const getData = (data: HoneyEntry[], arcade: boolean): ChartData => {
   return {
     labels: data.map((entry: any) => {
       const utcDate = new Date(entry.timestamp * 1000);
@@ -159,7 +220,7 @@ function calculatePercentageDifference(entries: HoneyEntry[]): number {
   return percentageDifference;
 }
 
-export const HoneyChart = ({ arcade = false }: { arcade?: boolean }) => {
+export const HoneyChart: FC<HoneyChartProps> = ({ arcade = false }): JSX.Element => {
   const [timeFrame, setTimeFrame] = useState(HoneyTimeFrame.WEEKLY);
   const calculatedTimestamp = useMemo(() => getTime(timeFrame), [timeFrame]);
   const [chart, setChart] = useState<Chart.VOLUME | Chart.FEES>(Chart.VOLUME);
@@ -169,6 +230,9 @@ export const HoneyChart = ({ arcade = false }: { arcade?: boolean }) => {
     error,
   } = useQuery(chart === Chart.VOLUME ? GetVolumeDay : GetSupplyDay, {
     variables: { timestamp_gt: calculatedTimestamp },
+    onError: (error) => {
+      console.error('Failed to fetch chart data:', error);
+    },
   });
 
   const { data: FirstTxnData } = useQuery(GetFirstHoneyTxnDate);
